@@ -1,6 +1,14 @@
 namespace MTCG;
 
-public class Card
+public interface Card
 {
-    
+    string name {
+        get;
+    }
+    int damage{
+        get;
+    }
+    string elementType{
+        get;
+    }
 }
