@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace MTCG;
 
 public class User
@@ -9,22 +11,25 @@ public class User
     private int coins;
     private int elo { get; }
     
-    public User(){}
-    public User(string username, string password) {
+
+    public User(string username) {
         this.username = username;
-        this.password = password;
         stack = new List<Card>();
         deck = new List<Card>();
         coins = 20;
     }
 
-    public void buyPack() {
+    public void buyPack(StreamWriter writer) {
         if (coins >= 5) {
             stack.AddRange(CardPool.drawPack());
             coins -= 5;
+            //to do: after implementing cards sendresponse of cards drawn
+            string responseString = "Pack bought!";
+            Server.SendResponse(writer, responseString);
         }
         else {
-            Console.WriteLine("Not enough coins.");
+            string responseString = "Not enough coins.";
+            Server.SendResponse(writer, responseString);
         }
     }
 
