@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 namespace MTCG;
 
@@ -6,20 +8,20 @@ public static class Server
 {
     static readonly int Port = 8080;
 
-    private static HttpListener _listener = null!;
+    private static TcpListener _listener = null!;
 
     public static void Start()
     {
-        _listener = new HttpListener();
-        _listener.Prefixes.Add("http://localhost:" + Port.ToString() + "/");
+        _listener = new TcpListener(IPAddress.Loopback, 8080);
+        
         _listener.Start();
         Console.WriteLine("Server running at http://localhost:" + Port.ToString() + "/");
         
         //fill card pool out of database
         CardPool.addCardsToPool(new List<Card>{new MonsterCard("blob", 10, "grass"), new MonsterCard("blub", 10, "water")});
-        while (_listener.IsListening) {
-            var context = _listener.GetContext();
-            ThreadPool.QueueUserWorkItem(ProcessRequest, context);
+        while (true) {
+            var clientSocket = _listener.AcceptTcpClient();
+            ThreadPool.QueueUserWorkItem(ProcessRequest, clientSocket);
         }
     }
 
@@ -29,51 +31,95 @@ public static class Server
     }
     
 
-    private static void ProcessRequest(object state)
-    {
-        var context = (HttpListenerContext)state;
-        var request = context.Request;
-        var response = context.Response;
+    private static void ProcessRequest(object? socket) {
+        TcpClient? clientSocket = (TcpClient?)socket;
+        using var writer = new StreamWriter(clientSocket.GetStream()) { AutoFlush = true };
+        using var reader = new StreamReader(clientSocket.GetStream());
+        string? line;
 
-        Console.WriteLine($"Received request: {request.HttpMethod} {request.Url}");
+        // 1.1 first line in HTTP contains the method, path and HTTP version
+        line = reader.ReadLine();
+        if ( line != null )
+            Console.WriteLine(line);
+
+        string method = line.Split(' ')[0];
+        string path = line.Split(' ')[1];
+
+        Dictionary<string, string> httpHeaders = new Dictionary<string, string>();
         
-        if (!IsRequestValid(request)) {
-            SendErrorResponse(response, "Malformed request. Please check your request format.");
+        
+        // 1.2 read the HTTP-headers (in HTTP after the first line, until the empy line)
+        int content_length = 0; // we need the content_length later, to be able to read the HTTP-content
+        while ((line = reader.ReadLine()) != null)
+        {
+            Console.WriteLine(line);
+            if (line == "")
+            {
+                break;  // empty line indicates the end of the HTTP-headers
+            }
+
+            // Parse the header
+            var parts = line.Split(':');
+            httpHeaders.Add(parts[0], parts[1]);
+            if (parts.Length == 2 && parts[0] == "Content-Length")
+            {
+                content_length = int.Parse(parts[1].Trim());
+            }
+        }
+
+        // 1.3 read the body if existing
+        var data = new StringBuilder(200);
+        
+        if ( content_length>0 )
+        {
+            char[] chars = new char[1024];
+            int bytesReadTotal = 0;
+            while ( bytesReadTotal < content_length)
+            {
+                var bytesRead = reader.Read(chars, 0, chars.Length);
+                bytesReadTotal += bytesRead;
+                if (bytesRead == 0)
+                    break;
+                data.Append(chars, 0, bytesRead);
+            }
+            Console.WriteLine( data.ToString() );
+        }
+
+        Console.WriteLine($"Received request: {method} {path}");
+        
+        if (!IsRequestValid(path)) {
+            SendErrorResponse(writer, "Malformed request. Please check your request format.", 500);
             return;
         }
         
-        string route = request.Url.AbsolutePath;
-
-        if (route == "/") {
-            RouteHandler.RootRoute(request, response);
+        if (path == "/") {
+            RouteHandler.RootRoute(writer);
         }
-        else if (route == "/login") {
-            RouteHandler.Login(request, response);
+        else if (path == "/login") {
+            RouteHandler.Login(writer, method, data.ToString());
 
         } 
-        else if (route == "/register") {
-            RouteHandler.Register(request, response);
+        else if (path == "/register") {
+            RouteHandler.Register(writer, method, data.ToString());
         }
-        else if (route == "/buyPack") {
-            RouteHandler.BuyPack(request, response);
+        else if (path == "/logout") {
+            RouteHandler.Logout(writer, method);
+        }
+        else if (path == "/buyPack") {
+            RouteHandler.BuyPack(writer, method);
         }
         else {
-            RouteHandler.NotFound(response);
+            RouteHandler.NotFound(writer);
         }
+        
         
     }
     
 
     
     //to do: implement more checks later
-    private static bool IsRequestValid(HttpListenerRequest request) {
-        string url = request.Url.ToString();
+    private static bool IsRequestValid(string url) {
 
-        // Check for scheme (protocol)
-        if (!url.StartsWith("http://") && !url.StartsWith("https://")) {
-            return false;
-        }
-        
         // Check for path traversal
         if (url.Contains("..")) {
             return false;
@@ -82,21 +128,21 @@ public static class Server
         return true;
     }
     
-    public static void SendResponse(HttpListenerResponse response, string responseString) {
-        response.ContentType = "text/plain";
-        byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(responseString);
-        response.ContentLength64 = responseBytes.Length;
-        response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
-        response.Close();
+    public static void SendResponse(StreamWriter writer, string responseString) {
+        writer.WriteLine("HTTP/1.0 200 OK");    // first line in HTTP-Response contains the HTTP-Version and the status code
+        writer.WriteLine("Content-Type: text/plain; charset=utf-8");     // the HTTP-headers (in HTTP after the first line, until the empy line)
+        writer.WriteLine("Content-Length: " + responseString.Length);
+        writer.WriteLine();
+        writer.Write(responseString);
     }
     
-    public static void SendErrorResponse(HttpListenerResponse response, string message) {
-        response.StatusCode = (int)HttpStatusCode.BadRequest;
-        response.ContentType = "text/plain";
-        byte[] errorBytes = System.Text.Encoding.UTF8.GetBytes(message);
-        response.ContentLength64 = errorBytes.Length;
-        response.OutputStream.Write(errorBytes, 0, errorBytes.Length);
-        response.Close();
+    public static void SendErrorResponse(StreamWriter writer, string responseString, int errCode) {
+        writer.WriteLine("HTTP/1.0 " + errCode);    // first line in HTTP-Response contains the HTTP-Version and the status code
+        writer.WriteLine("Content-Type: text/plain; charset=utf-8");     // the HTTP-headers (in HTTP after the first line, until the empy line)
+        writer.WriteLine("Content-Length: " + responseString.Length);
+        writer.WriteLine();
+        writer.Write(responseString);
+
     }
 
  

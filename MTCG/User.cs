@@ -19,17 +19,17 @@ public class User
         coins = 20;
     }
 
-    public void buyPack(HttpListenerResponse response) {
+    public void buyPack(StreamWriter writer) {
         if (coins >= 5) {
             stack.AddRange(CardPool.drawPack());
             coins -= 5;
             //to do: after implementing cards sendresponse of cards drawn
             string responseString = "Pack bought!";
-            Server.SendResponse(response, responseString);
+            Server.SendResponse(writer, responseString);
         }
         else {
             string responseString = "Not enough coins.";
-            Server.SendResponse(response, responseString);
+            Server.SendResponse(writer, responseString);
         }
     }
 
