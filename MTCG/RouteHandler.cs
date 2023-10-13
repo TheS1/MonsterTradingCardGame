@@ -1,17 +1,21 @@
 ﻿using System.Net;
-
+using Npgsql;
 namespace MTCG;
 
-public static class RouteHandler {
+public static class RouteHandler
+{
     private static Dictionary<string, User> sessions = new Dictionary<string, User>();
+
     // root route
-    public static void RootRoute(StreamWriter writer) {
+    public static void RootRoute(StreamWriter writer)
+    {
         string responseString = "root";
         Server.SendResponse(writer, responseString);
     }
-    
+
     // login route
-    public static void Login(StreamWriter writer, string method, string data) {
+    public static void Login(StreamWriter writer, string method, string data)
+    {
         /*
         if (method == "POST") {
             using (var reader = new StreamReader(.InputStream)) {
@@ -52,44 +56,31 @@ public static class RouteHandler {
     }
 
 
-    public static void Register(StreamWriter writer, string method, string data) {
-        /*if (request.HttpMethod == "POST") {
-            if (SentCookieFile(request)) {
-                using (var reader = new StreamReader(request.InputStream)) {
-                    var requestData = reader.ReadToEnd();
-                    var formData = requestData.Split(' ');
+    public static void Register(StreamWriter writer, string method, string data)
+    {
+        
+        if (method == "POST")
+        {
+            Console.WriteLine(data);
 
-                    if (formData.Length == 2) {
-                        string username = Uri.UnescapeDataString(formData[0]);
-                        string password = Uri.UnescapeDataString(formData[1]);
-                        //check if username exists, if password is good bla bla bla
+            string responseString = "got here";
+            Server.SendResponse(writer, responseString);
 
-                        string responseString = "user " + username + " created";
+            // Invalid form data
+            responseString = "Invalid Data. Use curl -d \"username password\"";
+            Server.SendResponse(writer, responseString);
 
-                        string sessionToken = Guid.NewGuid().ToString();
-                        sessions[sessionToken] = LoadUser(username);
-                        SetSessionCookie(writer, sessionToken);
-
-                        Server.SendResponse(writer, responseString);
-                    }
-                    else {
-                        // Invalid form data
-                        string responseString = "Invalid Data. Use curl -d \"username password\"";
-                        Server.SendResponse(writer, responseString);
-                    }
-                }
-            }
-            else {
-                string responseString = "Didnt send cookie file -> curl ... -c cookies.txt";
-                Server.SendResponse(writer, responseString);
-            }
         }
-        else {
-            string responseString = "Wrong request type expecting post";
-            Server.SendErrorResponse(writer, responseString);
+
+        else
+        {
+            string responseString = "Didnt send cookie file -> curl ... -c cookies.txt";
+            Server.SendResponse(writer, responseString);
         }
-        */
     }
+
+
+
     
     public static void Logout(StreamWriter writer, string method) {
         /*if (method == "GET") {
@@ -172,6 +163,6 @@ public static class RouteHandler {
     
     private static User LoadUser(string username) {
         //load user data out of database based on username, database doesnt exist yet
-        return new User(username);
+        return new User();
     }
 }

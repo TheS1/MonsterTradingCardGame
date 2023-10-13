@@ -10,8 +10,8 @@ public static class Server
 
     private static TcpListener _listener = null!;
 
-    public static void Start()
-    {
+    public static void Start() {
+        
         _listener = new TcpListener(IPAddress.Loopback, 8080);
         
         _listener.Start();
@@ -97,7 +97,6 @@ public static class Server
         }
         else if (path == "/login") {
             RouteHandler.Login(writer, method, data.ToString());
-
         } 
         else if (path == "/register") {
             RouteHandler.Register(writer, method, data.ToString());

@@ -2,21 +2,28 @@ using System.Net;
 
 namespace MTCG;
 
-public class User
-{
-    private string username { get; }
-    private string password;
+public class User {
+    private string username { get; set; }
+    private string password { get; set; }
     private List<Card> stack;
     private List<Card> deck { get; }
     private int coins;
     private int elo { get; }
+    private DateTime sessionTime { get; }
     
 
-    public User(string username) {
-        this.username = username;
+
+    public User() {
+        sessionTime = DateTime.Now;
         stack = new List<Card>();
         deck = new List<Card>();
         coins = 20;
+    }
+
+    public bool sessionExpired(DateTime timeNow) {
+        TimeSpan timeDifference = DateTime.Now - sessionTime;
+        double totalMinutes = timeDifference.TotalMinutes;
+        return totalMinutes < 90;
     }
 
     public void buyPack(StreamWriter writer) {
