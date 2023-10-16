@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text.Json;
 using Npgsql;
 namespace MTCG;
 
@@ -14,61 +15,46 @@ public static class RouteHandler
     }
 
     // login route
-    public static void Login(StreamWriter writer, string method, string data)
+    public static void Login(StreamWriter writer, string method, string contentType, string data)
     {
-        /*
+        Console.WriteLine(contentType);
         if (method == "POST") {
-            using (var reader = new StreamReader(.InputStream)) {
-                    var requestData = reader.ReadToEnd();
-                    var formData = requestData.Split(' ');
-
-                    if (formData.Length == 2) {
-                        string username = Uri.UnescapeDataString(formData[0]);
-                        string password = Uri.UnescapeDataString(formData[1]);
-
-                        if (username == "admin" && password == "admin") {
-                            // will be outsorced into load user once database
-                            string responseString = "Login successful!";
-
-                            Server.SendResponse(writer, responseString);
-                        }
-                        else {
-                            string responseString = "Login failed. Invalid username or password.";
-                            Server.SendResponse(writer, responseString);
-                        }
-                    }
-                    else {
-                        // Invalid form data
-                        string responseString = "Invalid Data. Use curl -d \"username password\"";
-                        Server.SendResponse(writer, responseString);
-                    }
-                
+            if (contentType == " application/json") {
+                User? user = JsonSerializer.Deserialize<User>(data);
+                if (DbManager.loginUser(user.getUsername(), user.getPassword())) {
+                    Server.sessionUsers.Add(user.getUsername() + "_Key",user);
+                    string responseString = "Logged in!";
+                    Server.SendResponse(writer, responseString);
+                }
+                else {
+                    
+                    string responseString = "Wrong username or password";
+                    Server.SendResponse(writer, responseString);
+                }
             }
-            else {
-                string responseString = "Didnt send cookie file -> curl ... -c cookies.txt";
-                Server.SendResponse(writer, responseString);
-            }
-        } else {
-            string responseString = "Wrong request type expecting post";
-            Server.SendErrorResponse(writer, responseString);
         }
-        */
     }
 
 
-    public static void Register(StreamWriter writer, string method, string data)
+    public static void Register(StreamWriter writer, string method, string contentType, string data)
     {
         
         if (method == "POST")
         {
-            Console.WriteLine(data);
-
-            string responseString = "got here";
-            Server.SendResponse(writer, responseString);
-
-            // Invalid form data
-            responseString = "Invalid Data. Use curl -d \"username password\"";
-            Server.SendResponse(writer, responseString);
+            if (contentType == " application/json")
+            {
+                User? user = JsonSerializer.Deserialize<User>(data);
+                if (DbManager.registerUser(user.getUsername(), user.getPassword())) {
+                    Server.sessionUsers.Add(user.getUsername() + "_Key",user);
+                    string responseString = "Registered successfully!";
+                    Server.SendResponse(writer, responseString);
+                }
+                else {
+                    
+                    string responseString = "Username already exists!";
+                    Server.SendResponse(writer, responseString);
+                }
+            }
 
         }
 

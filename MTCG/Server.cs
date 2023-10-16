@@ -9,9 +9,11 @@ public static class Server
     static readonly int Port = 8080;
 
     private static TcpListener _listener = null!;
+    public static Dictionary<string, User> sessionUsers = new Dictionary<string, User>();
+    public static void Start()
+    {
 
-    public static void Start() {
-        
+        DbManager.connect();
         _listener = new TcpListener(IPAddress.Loopback, 8080);
         
         _listener.Start();
@@ -19,6 +21,7 @@ public static class Server
         
         //fill card pool out of database
         CardPool.addCardsToPool(new List<Card>{new MonsterCard("blob", 10, "grass"), new MonsterCard("blub", 10, "water")});
+        
         while (true) {
             var clientSocket = _listener.AcceptTcpClient();
             ThreadPool.QueueUserWorkItem(ProcessRequest, clientSocket);
@@ -66,7 +69,6 @@ public static class Server
                 content_length = int.Parse(parts[1].Trim());
             }
         }
-
         // 1.3 read the body if existing
         var data = new StringBuilder(200);
         
@@ -85,6 +87,8 @@ public static class Server
             Console.WriteLine( data.ToString() );
         }
 
+        string contentType = httpHeaders["Content-Type"];
+
         Console.WriteLine($"Received request: {method} {path}");
         
         if (!IsRequestValid(path)) {
@@ -96,10 +100,10 @@ public static class Server
             RouteHandler.RootRoute(writer);
         }
         else if (path == "/login") {
-            RouteHandler.Login(writer, method, data.ToString());
+            RouteHandler.Login(writer, method, contentType, data.ToString());
         } 
         else if (path == "/register") {
-            RouteHandler.Register(writer, method, data.ToString());
+            RouteHandler.Register(writer, method, contentType, data.ToString());
         }
         else if (path == "/logout") {
             RouteHandler.Logout(writer, method);

@@ -1,27 +1,40 @@
 using System.Net;
+using System.Text.Json.Serialization;
 
 namespace MTCG;
 
 public class User {
-    private string username { get; set; }
-    private string password { get; set; }
+    private int id { get; set; }
+    [JsonPropertyName("Username")]
+    public string username { get; set; }
+    [JsonPropertyName("Password")]
+    public string password { get; set; }
     private List<Card> stack;
     private List<Card> deck { get; }
     private int coins;
     private int elo { get; }
-    private DateTime sessionTime { get; }
+    private DateTime timeActive { get; }
     
 
 
     public User() {
-        sessionTime = DateTime.Now;
+        timeActive = DateTime.Now;
         stack = new List<Card>();
         deck = new List<Card>();
         coins = 20;
     }
 
+    public string getUsername()
+    {
+        return username;
+    }
+
+    public string getPassword()
+    {
+        return password;
+    }
     public bool sessionExpired(DateTime timeNow) {
-        TimeSpan timeDifference = DateTime.Now - sessionTime;
+        TimeSpan timeDifference = DateTime.Now - timeActive;
         double totalMinutes = timeDifference.TotalMinutes;
         return totalMinutes < 90;
     }
