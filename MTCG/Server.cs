@@ -87,7 +87,8 @@ public static class Server
             Console.WriteLine( data.ToString() );
         }
 
-        string contentType = httpHeaders["Content-Type"];
+        string contentType = httpHeaders.ContainsKey("Content-Type") ? httpHeaders["Content-Type"] : "";
+        string authorizationToken = httpHeaders.ContainsKey("Authorization") ? httpHeaders["Authorization"].Split(' ')[2] : "";
 
         Console.WriteLine($"Received request: {method} {path}");
         
@@ -109,7 +110,7 @@ public static class Server
             RouteHandler.Logout(writer, method);
         }
         else if (path == "/buyPack") {
-            RouteHandler.BuyPack(writer, method);
+            RouteHandler.BuyPack(writer, method, authorizationToken);
         }
         else {
             RouteHandler.NotFound(writer);

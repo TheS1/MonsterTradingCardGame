@@ -5,8 +5,6 @@ namespace MTCG;
 
 public static class RouteHandler
 {
-    private static Dictionary<string, User> sessions = new Dictionary<string, User>();
-
     // root route
     public static void RootRoute(StreamWriter writer)
     {
@@ -15,36 +13,34 @@ public static class RouteHandler
     }
 
     // login route
-    public static void Login(StreamWriter writer, string method, string contentType, string data)
-    {
+    public static void Login(StreamWriter writer, string method, string contentType, string data) {
         Console.WriteLine(contentType);
         if (method == "POST") {
             if (contentType == " application/json") {
                 User? user = JsonSerializer.Deserialize<User>(data);
-                if (DbManager.loginUser(user.getUsername(), user.getPassword())) {
+                if (DbManager.loginUser(user)) {
                     Server.sessionUsers.Add(user.getUsername() + "_Key",user);
                     string responseString = "Logged in!";
                     Server.SendResponse(writer, responseString);
                 }
                 else {
-                    
                     string responseString = "Wrong username or password";
                     Server.SendResponse(writer, responseString);
                 }
             }
         }
+        else {
+            string responseString = "Wrong request type expected POST";
+            Server.SendResponse(writer, responseString);
+        }
     }
 
 
-    public static void Register(StreamWriter writer, string method, string contentType, string data)
-    {
-        
-        if (method == "POST")
-        {
-            if (contentType == " application/json")
-            {
+    public static void Register(StreamWriter writer, string method, string contentType, string data) {
+        if (method == "POST") {
+            if (contentType == " application/json") {
                 User? user = JsonSerializer.Deserialize<User>(data);
-                if (DbManager.registerUser(user.getUsername(), user.getPassword())) {
+                if (DbManager.registerUser(user)) {
                     Server.sessionUsers.Add(user.getUsername() + "_Key",user);
                     string responseString = "Registered successfully!";
                     Server.SendResponse(writer, responseString);
@@ -55,12 +51,12 @@ public static class RouteHandler
                     Server.SendResponse(writer, responseString);
                 }
             }
-
-        }
-
-        else
-        {
-            string responseString = "Didnt send cookie file -> curl ... -c cookies.txt";
+            else {
+                string responseString = "Data must be in json format";
+                Server.SendResponse(writer, responseString);
+            }
+        }else {
+            string responseString = "Wrong request type expected POST";
             Server.SendResponse(writer, responseString);
         }
     }
@@ -94,30 +90,23 @@ public static class RouteHandler
         */
     }
     
-    public static void BuyPack(StreamWriter writer, string method) {
-        /*
-        if (request.HttpMethod == "GET") {
-            if (SentCookieFile(request)) {
-                if (IsLoggedIn(request)) {
-                    string userToken = request.Cookies["Session-Token"]?.Value;
-                    sessions[userToken].buyPack(writer);
-                    //to do: update db when it exists
-                }
-                else {
-                    string responseString = "Log in first!";
-                    Server.SendResponse(writer, responseString);
-                }
+    public static void BuyPack(StreamWriter writer, string method, string authorizationToken) {
+        Console.WriteLine("Token:" +authorizationToken);
+        if (method == "GET") {
+            if (IsLoggedIn(authorizationToken)) {
+                string responseString = "Bought Pack";
+                Server.SendResponse(writer, responseString);
             }
             else {
-                string responseString = "Didnt send cookie file -> curl ... -b cookies.txt";
+                string responseString = "Not logged in";
                 Server.SendResponse(writer, responseString);
             }
             
         } else {
             string responseString = "Wrong request type";
-            Server.SendErrorResponse(writer, responseString);
+            Server.SendErrorResponse(writer, responseString, 400);
         }
-        */
+        
     }
 
     
@@ -133,11 +122,14 @@ public static class RouteHandler
         return true;
     }
     
-    private static bool IsLoggedIn(HttpListenerRequest request) {
-        // Extract the session token from the request (from cookies, headers, or other mechanisms)
-        string sessionToken = request.Cookies["Session-Token"]?.Value;
-        // Check if the session token is valid and associated with an authenticated user
-        return !string.IsNullOrEmpty(sessionToken) && sessions.ContainsKey(sessionToken);
+    private static bool IsLoggedIn(string authorizationToken) {
+        if (Server.sessionUsers.ContainsKey(authorizationToken)) {
+            if (!Server.sessionUsers[authorizationToken].sessionExpired()) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     

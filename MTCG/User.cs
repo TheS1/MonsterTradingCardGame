@@ -10,18 +10,27 @@ public class User {
     [JsonPropertyName("Password")]
     public string password { get; set; }
     private List<Card> stack;
-    private List<Card> deck { get; }
-    private int coins;
-    private int elo { get; }
-    private DateTime timeActive { get; }
+    private List<Card> deck { get; set; }
+    private int coins { get; set; }
+    private int elo { get; set; }
+    private DateTime timeActive { get; set; }
+
+
+
     
-
-
-    public User() {
+    public void setNewUserData() {
         timeActive = DateTime.Now;
         stack = new List<Card>();
         deck = new List<Card>();
-        coins = 20;
+        coins = 30;
+        elo = 1000;
+    }
+
+    public void setUserData(int coins, int elo) {
+        timeActive = DateTime.Now;
+        this.coins = coins;
+        this.elo = elo;
+
     }
 
     public string getUsername()
@@ -33,10 +42,10 @@ public class User {
     {
         return password;
     }
-    public bool sessionExpired(DateTime timeNow) {
+    public bool sessionExpired() {
         TimeSpan timeDifference = DateTime.Now - timeActive;
         double totalMinutes = timeDifference.TotalMinutes;
-        return totalMinutes < 90;
+        return totalMinutes > 90;
     }
 
     public void buyPack(StreamWriter writer) {
