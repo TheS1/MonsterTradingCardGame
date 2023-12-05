@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using MTCG;
+using MTCG.Server;
 
 internal class Program
 {

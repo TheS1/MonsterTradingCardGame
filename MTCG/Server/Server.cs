@@ -1,8 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-
-namespace MTCG;
+using MTCG.DAL;
+using MTCG.Models;
+namespace MTCG.Server;
 
 public static class Server
 {

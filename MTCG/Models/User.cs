@@ -1,18 +1,18 @@
-using System.Net;
 using System.Text.Json.Serialization;
+using MTCG.Server;
 
-namespace MTCG;
+namespace MTCG.Models;
 
 public class User {
-    private int id { get; set; }
+    public int id { get; set; }
     [JsonPropertyName("Username")]
     public string username { get; set; }
     [JsonPropertyName("Password")]
     public string password { get; set; }
     private List<Card> stack;
     private List<Card> deck { get; set; }
-    private int coins { get; set; }
-    private int elo { get; set; }
+    public int coins { get; set; }
+    public int elo { get; set; }
     private DateTime timeActive { get; set; }
 
 
@@ -22,12 +22,14 @@ public class User {
         timeActive = DateTime.Now;
         stack = new List<Card>();
         deck = new List<Card>();
+        password = "";
         coins = 30;
         elo = 1000;
     }
 
     public void setUserData(int coins, int elo) {
         timeActive = DateTime.Now;
+        password = "";
         this.coins = coins;
         this.elo = elo;
 
@@ -54,11 +56,11 @@ public class User {
             coins -= 5;
             //to do: after implementing cards sendresponse of cards drawn
             string responseString = "Pack bought!";
-            Server.SendResponse(writer, responseString);
+            Server.Server.SendResponse(writer, responseString);
         }
         else {
             string responseString = "Not enough coins.";
-            Server.SendResponse(writer, responseString);
+            Server.Server.SendResponse(writer, responseString);
         }
     }
 

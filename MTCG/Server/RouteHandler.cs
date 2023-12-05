@@ -1,7 +1,10 @@
 ﻿using System.Net;
 using System.Text.Json;
+using MTCG.DAL;
+using MTCG.Models;
 using Npgsql;
-namespace MTCG;
+
+namespace MTCG.Server;
 
 public static class RouteHandler
 {
@@ -131,13 +134,22 @@ public static class RouteHandler
 
         return false;
     }
-    
-    
-    
-    private static void SetSessionCookie(HttpListenerResponse writer, string sessionToken) {
-        var cookie = new Cookie("Session-Token", sessionToken);
-        writer.AppendCookie(cookie);
+
+
+    private static bool buyPackages(string authorizationToken)
+    {
+        if (Server.sessionUsers.ContainsKey(authorizationToken)) {
+            if (!Server.sessionUsers[authorizationToken].sessionExpired()) {
+                return true;
+            }
+        }
+
+        return false;
     }
+    
+    
+    
+    
     
     private static User LoadUser(string username) {
         //load user data out of database based on username, database doesnt exist yet
