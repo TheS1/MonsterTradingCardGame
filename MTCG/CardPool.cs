@@ -1,3 +1,4 @@
+using MTCG.Models;
 namespace MTCG;
 
 public static class CardPool

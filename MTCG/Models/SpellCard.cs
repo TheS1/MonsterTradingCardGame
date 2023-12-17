@@ -1,8 +1,8 @@
-namespace MTCG;
+namespace MTCG.Models;
 
-public class MonsterCard : Card
+public class SpellCard : Card
 {
-    public MonsterCard(string name, int damage, string elementType)
+    public SpellCard(string name, int damage, string elementType)
     {
         this.name = name;
         this.damage = damage;

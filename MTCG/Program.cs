@@ -4,12 +4,11 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using MTCG;
+using MTCG.Server;
 
 internal class Program
 {
-    public static void Main(string[] args)
-    {
-        
+    public static void Main(string[] args) {
         Server.Start();
         
         while (true){}
