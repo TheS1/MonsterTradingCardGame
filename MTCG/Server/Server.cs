@@ -48,7 +48,7 @@ public static class Server
 
         string method = line.Split(' ')[0];
         string path = line.Split(' ')[1];
-
+        
         Dictionary<string, string> httpHeaders = new Dictionary<string, string>();
         
         

@@ -79,6 +79,7 @@ public class UserDbRepo
             }
         }
     }
+    /*
     public User setUserData(User user, bool newUser) {
         using (var connection = new NpgsqlConnection(_connectionString))
         {
@@ -158,7 +159,7 @@ public class UserDbRepo
             }
         }
     }
-
+/*
     public void Delete(int userId)
     {
         using (var connection = new NpgsqlConnection(_connectionString))
