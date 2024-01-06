@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using MTCG.DAL;
 using MTCG.Models;
+using MTCG.Logic;
 namespace MTCG.Server;
 
 public static class Server
@@ -11,6 +12,7 @@ public static class Server
 
     private static TcpListener _listener = null!;
     public static Dictionary<string, User> sessionUsers = new Dictionary<string, User>();
+    public static BattleManager BattleManager = new BattleManager();
     public static void Start()
     {
 
@@ -21,8 +23,6 @@ public static class Server
         Console.WriteLine("Server running at http://localhost:" + Port.ToString() + "/");
         
         //fill card pool out of database
-        CardPool.addCardsToPool(new List<Card>{new MonsterCard("blob", 10, "grass"), new MonsterCard("blub", 10, "water")});
-        
         while (true) {
             var clientSocket = _listener.AcceptTcpClient();
             ThreadPool.QueueUserWorkItem(ProcessRequest, clientSocket);
@@ -90,13 +90,14 @@ public static class Server
 
         string contentType = httpHeaders.ContainsKey("Content-Type") ? httpHeaders["Content-Type"] : "";
         string authorizationToken = httpHeaders.ContainsKey("Authorization") ? httpHeaders["Authorization"].Split(' ')[2] : "";
-
+        
         Console.WriteLine($"Received request: {method} {path}");
         
         if (!IsRequestValid(path)) {
             SendErrorResponse(writer, "Malformed request. Please check your request format.", 500);
             return;
         }
+
         
         if (path == "/") {
             RouteHandler.RootRoute(writer);
@@ -110,17 +111,51 @@ public static class Server
         else if (path == "/logout") {
             RouteHandler.Logout(writer, method);
         }
-        else if (path == "/buyPack") {
-            RouteHandler.BuyPack(writer, method, authorizationToken);
+        else if (path == "/addCards" && IsAdmin(authorizationToken))
+        {
+            RouteHandler.AddCards(writer, method, data.ToString());
         }
+        else if (path == "/buyPack") {
+            RouteHandler.BuyPack(writer, method, authorizationToken, data.ToString());
+        }
+        else if (path == "/cards") {
+            RouteHandler.showCards(writer, method, authorizationToken);
+        }
+        else if (path == "/deck") {
+            RouteHandler.deckManagement(writer, method, authorizationToken, data.ToString());
+        }
+        else if (path == "/myProfile") {
+            RouteHandler.userProfile(writer, method, authorizationToken, data.ToString());
+        }
+        else if (path == "/scoreboard") {
+            RouteHandler.Scoreboard(writer, method);
+        }
+        else if (path == "/battle") {
+            RouteHandler.Battle(writer, method, authorizationToken);
+        }
+        
         else {
             RouteHandler.NotFound(writer);
         }
-        
-        
     }
     
-
+    public static bool IsLoggedIn(string authorizationToken) {
+        if (sessionUsers.ContainsKey(authorizationToken)) {
+            if (!sessionUsers[authorizationToken].sessionExpired()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private static bool IsAdmin(string authorizationToken) {
+        if (IsLoggedIn(authorizationToken)) {
+            if (sessionUsers[authorizationToken].isAdmin) {
+                return true;
+            }
+        }
+        return false;
+    }
     
     //to do: implement more checks later
     private static bool IsRequestValid(string url) {
