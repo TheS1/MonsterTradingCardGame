@@ -1,81 +1,101 @@
 ﻿using MTCG.Models;
+using MTCG.DAL;
 public class Battle
 {
-    private User player1;
-    private User player2;
-    private int winner;
-    private DateTime battleDate;
-    private int maxRounds;
-    private string log;
+    private User _player1;
+    private User _player2;
+    private float _result;
+    private DateTime _battleDate;
+    private int _maxRounds;
+    private string _log;
+    public string Winstring;
+    private int _eloChange;
     public Battle(User player1, User player2, int maxRounds = 100)
     {
-        this.player1 = player1;
-        this.player2 = player2;
-        this.maxRounds = maxRounds;
+        _player1 = player1;
+        _player2 = player2;
+        Console.WriteLine(_player1.Username);
+        Console.WriteLine(_player2.Username);
+        Console.WriteLine(_player1.Id);
+        Console.WriteLine(_player2.Id);
+        _maxRounds = maxRounds;
     }
 
     public void StartBattle()
     {
         int round = 1;
-
-        while (round <= maxRounds) {
-            if (!player1.HasCards()) {
-                winner = 1;
-                log += player1.username + " wins!\n";
-                break; // Exit the loop if one of the players has no cards
+        _battleDate = DateTime.Now;
+        while (round <= _maxRounds) {
+            if (!_player1.HasCards()) {
+                _result = 0;
+                Winstring = "p2 wins";
+                _log += _player2.Username + " wins!\n";
+                _eloChange = CalcElo(_player1.Elo, _player2.Elo, _result);
+                DbManager.HandleBattleResult(_player1, _player2, _result, _battleDate, round, _eloChange);
+                return; 
             } 
-            if (!player2.HasCards()) {
-                winner = 2;
-                log += player2.username + " wins!\n";
-                break; // Exit the loop if one of the players has no cards
+            if (!_player2.HasCards()) {
+                _result = 1;
+                Winstring = "p1 wins";
+                _log += _player1.Username + " wins!\n";
+                _eloChange = CalcElo(_player1.Elo, _player2.Elo, _result);
+                DbManager.HandleBattleResult(_player1, _player2, _result, _battleDate, round, _eloChange);
+                return; 
             } 
 
-            Card cardPlayer1 = player1.ChooseRandomCard();
-            Card cardPlayer2 = player2.ChooseRandomCard();
+            Card cardPlayer1 = _player1.ChooseRandomCard();
+            Card cardPlayer2 = _player2.ChooseRandomCard();
 
             double damageUser1 = cardPlayer1.CalculateDamage(cardPlayer2);
             double damageUser2 = cardPlayer2.CalculateDamage(cardPlayer1);
 
-            Console.WriteLine($"{player1.username}'s {cardPlayer1.Name} attacks with {damageUser1} damage.");
-            Console.WriteLine($"{player2.username}'s {cardPlayer2.Name} attacks with {damageUser2} damage.");
-            log += "Round " + round + ": " + player1.username + ": " + cardPlayer1.Name + " " + cardPlayer1.Damage +
-                   " vs " + cardPlayer2.Damage + " " + cardPlayer2.Name + " => " + damageUser1 + " vs " + damageUser2;
+            Console.WriteLine($"{_player1.Username}'s {cardPlayer1.Name} attacks with {damageUser1} damage.");
+            Console.WriteLine($"{_player2.Username}'s {cardPlayer2.Name} attacks with {damageUser2} damage.");
+            _log += "Round " + round + ": " + _player1.Username + ": " + cardPlayer1.Name + " " + cardPlayer1.Damage +
+                   " vs " +  _player2.Username + ": " + cardPlayer2.Name + " " + cardPlayer2.Damage + " => " + damageUser1 + " vs " + damageUser2;
             
             if (damageUser1 > damageUser2)
             {
-                log += " => " + cardPlayer1.Name + " wins\n";
-                Console.WriteLine($"{player1.username} wins the round!");
-                player1.AddCard(cardPlayer2);
-                player2.RemoveCard(cardPlayer2);
+                _log += " => " +_player1.Username + "'s "+ cardPlayer1.Name + " wins\n";
+                Console.WriteLine($"{_player1.Username} wins the round!");
+                _player1.AddCard(cardPlayer2);
+                _player2.RemoveCard(cardPlayer2);
             }
             else if (damageUser2 > damageUser1)
             {
-                log += " => " + cardPlayer2.Name + " wins\n";
-                Console.WriteLine($"{player2.username} wins the round!");
-                player2.AddCard(cardPlayer1);
-                player1.RemoveCard(cardPlayer1);
+                _log += " => " + _player2.Username + "'s "+ cardPlayer2.Name + " wins\n";
+                Console.WriteLine($"{_player2.Username} wins the round!");
+                _player2.AddCard(cardPlayer1);
+                _player1.RemoveCard(cardPlayer1);
             }
             else
             {
-                log += " Draw (no action)\n";
+                _log += " Draw (no action)\n";
                 Console.WriteLine("It's a draw! No cards are moved.");
             }
 
-            Console.WriteLine($"{player1.username}'s Deck: {string.Join(", ", player1.GetDeck())}");
-            Console.WriteLine($"{player2.username}'s Deck: {string.Join(", ", player2.GetDeck())}");
+            Console.WriteLine($"{_player1.Username}'s Deck: {string.Join(", ", _player1.GetDeck())}");
+            Console.WriteLine($"{_player2.Username}'s Deck: {string.Join(", ", _player2.GetDeck())}");
             Console.WriteLine();
     
             round++;
         }
     
-        log += "Draw after 100 rounds";
-        winner = 0;
-
-
+        _log += "Draw after 100 rounds";
+        Winstring = "draw";
+        _result = 0.5f;
+        _eloChange = CalcElo(_player1.Elo, _player2.Elo, _result);
+        DbManager.HandleBattleResult(_player1, _player2, _result, _battleDate, round, _eloChange);
     }
 
-    public string getLog()
+
+    private int CalcElo(int eloP1, int eloP2, float result) {
+        double e = 1 / (1 + Math.Pow(10, (eloP2 - eloP1) / 400));
+        int eloChange = (int)Math.Round(20 * (result - e));
+        return eloChange;
+    }
+    public string GetLog()
     {
-        return log;
+        return _log;
     }
 }

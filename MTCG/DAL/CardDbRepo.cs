@@ -4,9 +4,9 @@ namespace MTCG.DAL;
 
 public class CardDbRepo
 {
-    private NpgsqlConnection connection;
+    private NpgsqlConnection _connection;
     public CardDbRepo(NpgsqlConnection connection) {
-        this.connection = connection;
+        this._connection = connection;
     }
     
     public bool AddCard(string cardId, string cardName, double cardDamage, string cardType, string elementType, int cardSetId)
@@ -14,7 +14,7 @@ public class CardDbRepo
         using (var command = new NpgsqlCommand(
                    "INSERT INTO cards (card_id, card_name, element_type, card_type, damage_value, card_set) " +
                    "VALUES (@CardId, @CardName, @ElementType, @CardType, @DamageValue, @CardSetId)",
-                   connection))
+                   _connection))
             {
                 command.Parameters.AddWithValue("CardId", cardId);
                 command.Parameters.AddWithValue("CardName", cardName);
@@ -30,7 +30,7 @@ public class CardDbRepo
 
     public int CardSetExists(string setName)
     {
-        using (var command = new NpgsqlCommand("SELECT set_id FROM cardSets WHERE set_name = @setName", connection))
+        using (var command = new NpgsqlCommand("SELECT set_id FROM cardSets WHERE set_name = @setName", _connection))
         {
             command.Parameters.AddWithValue("setName", setName);
 
@@ -47,31 +47,31 @@ public class CardDbRepo
     }
 
 
-    public List<string> drawPack(int setID)
+    public List<string> DrawPack(int setId)
     {
-        List<string> CardsDrawn = new List<string>();
+        List<string> cardsDrawn = new List<string>();
         
-        using (NpgsqlCommand command = new NpgsqlCommand("select * from cards where card_set = @setID and card_id not in (select card_id from UserCards) order by random() limit 5", connection))
+        using (NpgsqlCommand command = new NpgsqlCommand("select * from cards where card_set = @setID and card_id not in (select card_id from UserCards) order by random() limit 5", _connection))
         {
-            command.Parameters.AddWithValue("setID", setID);
+            command.Parameters.AddWithValue("setID", setId);
             using (NpgsqlDataReader reader = command.ExecuteReader())
             {
                 while (reader.Read())
                 {
                     // Retrieve the ID column and add it to the list
                     string id = reader["card_id"].ToString();
-                    CardsDrawn.Add(id);
+                    cardsDrawn.Add(id);
                 }
             }
         }
-        return CardsDrawn;
+        return cardsDrawn;
     }
 
 
-    public string getCardInfoByID(string cardID) {
-        Console.WriteLine("Id:" + cardID);
-        using (NpgsqlCommand command = new NpgsqlCommand("select * from cards where card_id = @cardID order by damage_value desc", connection)){
-            command.Parameters.AddWithValue("cardID", cardID);
+    public string GetCardInfoById(string cardId) {
+        Console.WriteLine("Id:" + cardId);
+        using (NpgsqlCommand command = new NpgsqlCommand("select * from cards where card_id = @cardID order by damage_value desc", _connection)){
+            command.Parameters.AddWithValue("cardID", cardId);
             using (NpgsqlDataReader reader = command.ExecuteReader())
             {
                 while (reader.Read())
@@ -79,21 +79,21 @@ public class CardDbRepo
                     // Retrieve the ID column and add it to the list
                     string id = reader["card_id"].ToString();
                     string name = reader["card_name"].ToString();
-                    string element_type = reader["element_type"].ToString();
-                    string card_type = reader["card_type"].ToString();
-                    string damage_value = reader["damage_value"].ToString();
+                    string elementType = reader["element_type"].ToString();
+                    string cardType = reader["card_type"].ToString();
+                    string damageValue = reader["damage_value"].ToString();
 
-                    return " " + id + ": " + name + ", " + element_type + ", " + card_type + ", Damage: " + damage_value;
+                    return " " + id + ": " + name + ", " + elementType + ", " + cardType + ", Damage: " + damageValue;
                 }
             }
         }
 
         return "";
     }
-    public int GetCardSetPrice(int setID)
+    public int GetCardSetPrice(int setId)
     {
-        using (var command = new NpgsqlCommand("SELECT set_price FROM cardSets WHERE set_id = @setID", connection)) {
-            command.Parameters.AddWithValue("setID", setID);
+        using (var command = new NpgsqlCommand("SELECT set_price FROM cardSets WHERE set_id = @setID", _connection)) {
+            command.Parameters.AddWithValue("setID", setId);
 
             using (var reader = command.ExecuteReader()) {
                 if (reader.Read()) {

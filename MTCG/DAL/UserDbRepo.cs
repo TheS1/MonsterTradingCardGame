@@ -1,3 +1,4 @@
+using System.Data;
 using Npgsql;
 using MTCG.Models;
 
@@ -6,14 +7,14 @@ namespace MTCG.DAL;
 public class UserDbRepo
 {
     
-    private NpgsqlConnection connection;
+    private NpgsqlConnection _connection;
     public UserDbRepo(NpgsqlConnection connection) {
-        this.connection = connection;
+        this._connection = connection;
     }
 
     
     public bool LoginUser(string username, string password) {
-        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username AND password = @password", connection))
+        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username AND password = @password", _connection))
         {
             command.Parameters.AddWithValue("username", username);
             command.Parameters.AddWithValue("password", password);
@@ -29,7 +30,7 @@ public class UserDbRepo
     }
     
     public bool UsernameExists(string username) {
-        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username", connection))
+        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username", _connection))
         {
             command.Parameters.AddWithValue("username", username);
             using (var reader = command.ExecuteReader())
@@ -44,11 +45,11 @@ public class UserDbRepo
     }
     
     
-    public bool UsernameExistsBesidesSelf(int userID, string username) {
-        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username and id != @userID", connection))
+    public bool UsernameExistsBesidesSelf(int userId, string username) {
+        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username and id != @userID", _connection))
         {
             command.Parameters.AddWithValue("username", username);
-            command.Parameters.AddWithValue("userID", userID);
+            command.Parameters.AddWithValue("userID", userId);
             using (var reader = command.ExecuteReader())
             {
                 if (reader.Read())
@@ -60,8 +61,8 @@ public class UserDbRepo
         return false;
     }
     
-    public bool isAdmin(string username) {
-        using (var command = new NpgsqlCommand("SELECT admin FROM users WHERE username = @username", connection))
+    public bool IsAdmin(string username) {
+        using (var command = new NpgsqlCommand("SELECT admin FROM users WHERE username = @username", _connection))
         {
             command.Parameters.AddWithValue("username", username);
             var result = command.ExecuteScalar();
@@ -71,62 +72,80 @@ public class UserDbRepo
 
     public void SetUserData(User user) {
         
-        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username", connection)) {
-            command.Parameters.AddWithValue("username", user.getUsername());
+        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE username = @username", _connection)) {
+            command.Parameters.AddWithValue("username", user.GetUsername());
             using (var reader = command.ExecuteReader()) {
                 if (reader.Read()) {
-                    user.id = Convert.ToInt32(reader["id"]);
-                    user.username = reader["username"].ToString();
-                    user.coins = Convert.ToInt32(reader["coins"]);
-                    user.elo = Convert.ToInt32(reader["elo"]);
-                    user.isAdmin = Convert.ToBoolean(reader["admin"]);
-                    user.timeActive = DateTime.Now;
+                    user.Id = Convert.ToInt32(reader["id"]);
+                    user.Username = reader["username"].ToString();
+                    user.Coins = Convert.ToInt32(reader["coins"]);
+                    user.Elo = Convert.ToInt32(reader["elo"]);
+                    user.IsAdmin = Convert.ToBoolean(reader["admin"]);
+                    user.TimeActive = DateTime.Now;
                 }
             }
         }
+
+        List<Card> cardDeck = new List<Card>();
+        using (NpgsqlCommand command = new NpgsqlCommand("select cards.card_id, cards.card_name, cards.card_type, cards.damage_value, cards.element_type from userCards inner join cards on cards.card_id = userCards.card_id where userCards.id = @userID and userCards.inDeck = true", _connection)) {
+            command.Parameters.AddWithValue("userID", user.Id);
+            using (NpgsqlDataReader reader = command.ExecuteReader()) {
+                while (reader.Read()) {
+                    Card card = new Card {
+                        Id = reader["card_id"].ToString(),
+                        Name = reader["card_name"].ToString(),
+                        Type = reader["card_type"].ToString(),
+                        Damage = Convert.ToDouble(reader["damage_value"]),
+                        Element = (ElementType)Enum.Parse(typeof(ElementType), reader["element_type"].ToString())
+                    };
+                    cardDeck.Add(card);
+                }
+            }
+        }
+        user.UpdateDeck(cardDeck);
     }
 
     public void Add(User user) {
         const string insertQuery = "INSERT INTO users (username, password) VALUES (@username, @password)";
-        using (var insertCmd = new NpgsqlCommand(insertQuery, connection))
+        using (var insertCmd = new NpgsqlCommand(insertQuery, _connection))
         {
-            insertCmd.Parameters.AddWithValue("@username", user.getUsername());
-            insertCmd.Parameters.AddWithValue("@password", user.getPassword());
+            insertCmd.Parameters.AddWithValue("@username", user.GetUsername());
+            insertCmd.Parameters.AddWithValue("@password", user.GetPassword());
             insertCmd.ExecuteNonQuery();
         }
     }
 
 
-    public void AddCardsToUser(int userID, string cardID) {
+    public void AddCardsToUser(int userId, string cardId) {
         const string insertQuery = "INSERT INTO userCards (id, card_id) VALUES (@userID, @cardID)";
-        Console.WriteLine(userID);
-        Console.WriteLine(cardID);
-        using (var insertCmd = new NpgsqlCommand(insertQuery, connection))
+        Console.WriteLine(userId);
+        Console.WriteLine(cardId);
+        using (var insertCmd = new NpgsqlCommand(insertQuery, _connection))
         {
-            insertCmd.Parameters.AddWithValue("@userID", userID);
-            insertCmd.Parameters.AddWithValue("@cardID", cardID);
+            insertCmd.Parameters.AddWithValue("@userID", userId);
+            insertCmd.Parameters.AddWithValue("@cardID", cardId);
             insertCmd.ExecuteNonQuery();
         }
     }
 
 
-    public void SubtractCoins(int userID, int price) {
+    public void SubtractCoins(int userId, int price) {
         string updateQuery = "UPDATE users SET coins = coins - @coinsToSubtract WHERE id = @userId";
         // Specify the number of coins to subtract
-        using (NpgsqlCommand updateCommand = new NpgsqlCommand(updateQuery, connection))
+        using (NpgsqlCommand updateCommand = new NpgsqlCommand(updateQuery, _connection))
         {
             // Add parameters to the update command
             updateCommand.Parameters.AddWithValue("@coinsToSubtract", price);
-            updateCommand.Parameters.AddWithValue("@userId", userID);
+            updateCommand.Parameters.AddWithValue("@userId", userId);
             updateCommand.ExecuteNonQuery();
         }
     }
 
-    public bool UserOwnsCard(int userID, string cardID) {
-        using (var command = new NpgsqlCommand("SELECT * FROM userCards WHERE id = @userID AND card_ID = @cardID", connection))
+    public bool UserOwnsCard(int userId, string cardId) {
+        using (var command = new NpgsqlCommand("SELECT * FROM userCards WHERE id = @userID AND card_ID = @cardID", _connection))
         {
-            command.Parameters.AddWithValue("userID", userID);
-            command.Parameters.AddWithValue("cardID", cardID);
+            command.Parameters.AddWithValue("userID", userId);
+            command.Parameters.AddWithValue("cardID", cardId);
             using (var reader = command.ExecuteReader())
             {
                 if (reader.Read())
@@ -139,12 +158,12 @@ public class UserDbRepo
     }
     
     
-    public List<string> getCardsOfUser(int userID) {
+    public List<string> GetCardsOfUser(int userId) {
         List<string> cards = new List<string>();
         
-        using (NpgsqlCommand command = new NpgsqlCommand("select userCards.card_id from userCards inner join cards on cards.card_id = userCards.card_id where userCards.id = @userID order by damage_value desc;", connection))
+        using (NpgsqlCommand command = new NpgsqlCommand("select userCards.card_id from userCards inner join cards on cards.card_id = userCards.card_id where userCards.id = @userID order by damage_value desc;", _connection))
         {
-            command.Parameters.AddWithValue("userID", userID);
+            command.Parameters.AddWithValue("userID", userId);
             using (NpgsqlDataReader reader = command.ExecuteReader()) {
                 while (reader.Read()) {
                     string cardId = reader["card_id"].ToString() ?? "";
@@ -156,14 +175,14 @@ public class UserDbRepo
     }
     
     
-    public List<Card> updateDeck(int userID, List<string> deck) {
+    public List<Card> UpdateDeck(int userId, List<string> deck) {
         List<Card> cardDeck = new List<Card>();
-        using (NpgsqlCommand command = new NpgsqlCommand("update userCards set indeck = false where id = @userID", connection)) {
-            command.Parameters.AddWithValue("userID", userID);
+        using (NpgsqlCommand command = new NpgsqlCommand("update userCards set indeck = false where id = @userID", _connection)) {
+            command.Parameters.AddWithValue("userID", userId);
             command.ExecuteNonQuery();
         }
         
-        using (NpgsqlCommand command = new NpgsqlCommand("update userCards set indeck = true where card_id in (@card1, @card2, @card3, @card4)", connection)) {
+        using (NpgsqlCommand command = new NpgsqlCommand("update userCards set indeck = true where card_id in (@card1, @card2, @card3, @card4)", _connection)) {
             command.Parameters.AddWithValue("card1", deck[0]);
             command.Parameters.AddWithValue("card2", deck[1]);
             command.Parameters.AddWithValue("card3", deck[2]);
@@ -171,7 +190,7 @@ public class UserDbRepo
             command.ExecuteNonQuery();
         }
 
-        using (NpgsqlCommand command = new NpgsqlCommand("SELECT * FROM cards WHERE card_id in (@card1, @card2, @card3, @card4)", connection)) {
+        using (NpgsqlCommand command = new NpgsqlCommand("SELECT * FROM cards WHERE card_id in (@card1, @card2, @card3, @card4)", _connection)) {
             command.Parameters.AddWithValue("card1", deck[0]);
             command.Parameters.AddWithValue("card2", deck[1]);
             command.Parameters.AddWithValue("card3", deck[2]);
@@ -214,9 +233,9 @@ public class UserDbRepo
     }
     */
 
-    public string getUserProfile(int userID) {
-        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE id = @userID", connection)) {
-            command.Parameters.AddWithValue("userID", userID);
+    public string GetUserProfile(int userId) {
+        using (var command = new NpgsqlCommand("SELECT * FROM users WHERE id = @userID", _connection)) {
+            command.Parameters.AddWithValue("userID", userId);
             using (var reader = command.ExecuteReader()) {
                 if (reader.Read()) {
                     string username = reader["username"].ToString();
@@ -234,13 +253,13 @@ public class UserDbRepo
 
         return "";
     }
-    public List<string> getDeckOfUser(int userID)
+    public List<string> GetDeckOfUser(int userId)
     {
         List<string> cards = new List<string>();
             
-        using (NpgsqlCommand command = new NpgsqlCommand("select userCards.card_id from userCards where id = @userID and indeck = true;", connection))
+        using (NpgsqlCommand command = new NpgsqlCommand("select userCards.card_id from userCards where id = @userID and indeck = true;", _connection))
         {
-            command.Parameters.AddWithValue("userID", userID);
+            command.Parameters.AddWithValue("userID", userId);
             using (NpgsqlDataReader reader = command.ExecuteReader()) {
                 while (reader.Read()) {
                     string cardId = reader["card_id"].ToString() ?? "";
@@ -251,23 +270,23 @@ public class UserDbRepo
         return cards;
     }
 
-    public void updateProfile(int userID, string username, string bio, string image)
+    public void UpdateProfile(int userId, string username, string bio, string image)
     {
-        using (NpgsqlCommand command = new NpgsqlCommand("update users set username = @username, bio = @bio, image = @image  where id = @userID", connection)) {
+        using (NpgsqlCommand command = new NpgsqlCommand("update users set username = @username, bio = @bio, image = @image  where id = @userID", _connection)) {
             command.Parameters.AddWithValue("username", username);
             command.Parameters.AddWithValue("bio", bio);
             command.Parameters.AddWithValue("image", image);
-            command.Parameters.AddWithValue("userID", userID);
+            command.Parameters.AddWithValue("userID", userId);
             command.ExecuteNonQuery();
         }
 
     }
 
-    public List<string> getScoreboard()
+    public List<string> GetScoreboard()
     {
         List<string> users = new List<string>();
         
-        using (NpgsqlCommand command = new NpgsqlCommand("select image, username, elo, wins, losses from users where admin = false order by elo limit 5", connection))
+        using (NpgsqlCommand command = new NpgsqlCommand("select image, username, elo, wins, losses from users where admin = false order by elo desc limit 5", _connection))
         {
             using (NpgsqlDataReader reader = command.ExecuteReader()) {
                 while (reader.Read()) {
@@ -283,6 +302,35 @@ public class UserDbRepo
         }
 
         return users;
+    }
+
+
+    public void AddBattle(int player1Id, int player2Id, float result, DateTime date, int turns)
+    {
+        const string insertQuery = "INSERT INTO battles (player1, player2, result, date, turns) VALUES (@user1ID, @user2ID, @result, @date, @turns)";
+        using (var insertCmd = new NpgsqlCommand(insertQuery, _connection))
+        {
+            insertCmd.Parameters.AddWithValue("@user1ID", player1Id);
+            insertCmd.Parameters.AddWithValue("@user2ID", player2Id);
+            insertCmd.Parameters.AddWithValue("@result", result);
+            insertCmd.Parameters.AddWithValue("@date", date);
+            insertCmd.Parameters.AddWithValue("@turns", turns);
+            insertCmd.ExecuteNonQuery();
+        }
+
+    }
+
+    public void UpdateElo(int userId, int eloChange, int win, int loss) {
+        string updateQuery = "UPDATE users SET elo = elo + @eloChange, wins = wins + @win, losses = losses + @loss WHERE id = @userID";
+        using (NpgsqlCommand updateCommand = new NpgsqlCommand(updateQuery, _connection))
+        {
+            // Add parameters to the update command
+            updateCommand.Parameters.AddWithValue("@eloChange", eloChange);
+            updateCommand.Parameters.AddWithValue("@userID", userId);
+            updateCommand.Parameters.AddWithValue("@win", win);
+            updateCommand.Parameters.AddWithValue("@loss", loss);
+            updateCommand.ExecuteNonQuery();
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using MTCG.DAL;
 using MTCG.Models;
 using MTCG.Logic;
@@ -10,19 +11,20 @@ public static class Server
 {
     static readonly int Port = 8080;
 
-    private static TcpListener _listener = null!;
-    public static Dictionary<string, User> sessionUsers = new Dictionary<string, User>();
+    private static TcpListener _listener;
+    public static Dictionary<string, User> SessionUsers = new Dictionary<string, User>();
     public static BattleManager BattleManager = new BattleManager();
     public static void Start()
     {
 
-        DbManager.connect();
+        DbManager.Connect();
         _listener = new TcpListener(IPAddress.Loopback, 8080);
         
         _listener.Start();
         Console.WriteLine("Server running at http://localhost:" + Port.ToString() + "/");
         
-        //fill card pool out of database
+        BattleManager.StartMatchmaking();
+
         while (true) {
             var clientSocket = _listener.AcceptTcpClient();
             ThreadPool.QueueUserWorkItem(ProcessRequest, clientSocket);
@@ -53,7 +55,7 @@ public static class Server
         
         
         // 1.2 read the HTTP-headers (in HTTP after the first line, until the empy line)
-        int content_length = 0; // we need the content_length later, to be able to read the HTTP-content
+        int contentLength = 0; // we need the content_length later, to be able to read the HTTP-content
         while ((line = reader.ReadLine()) != null)
         {
             Console.WriteLine(line);
@@ -67,17 +69,17 @@ public static class Server
             httpHeaders.Add(parts[0], parts[1]);
             if (parts.Length == 2 && parts[0] == "Content-Length")
             {
-                content_length = int.Parse(parts[1].Trim());
+                contentLength = int.Parse(parts[1].Trim());
             }
         }
         // 1.3 read the body if existing
         var data = new StringBuilder(200);
         
-        if ( content_length>0 )
+        if ( contentLength>0 )
         {
             char[] chars = new char[1024];
             int bytesReadTotal = 0;
-            while ( bytesReadTotal < content_length)
+            while ( bytesReadTotal < contentLength)
             {
                 var bytesRead = reader.Read(chars, 0, chars.Length);
                 bytesReadTotal += bytesRead;
@@ -97,7 +99,6 @@ public static class Server
             SendErrorResponse(writer, "Malformed request. Please check your request format.", 500);
             return;
         }
-
         
         if (path == "/") {
             RouteHandler.RootRoute(writer);
@@ -108,9 +109,6 @@ public static class Server
         else if (path == "/register") {
             RouteHandler.Register(writer, method, contentType, data.ToString());
         }
-        else if (path == "/logout") {
-            RouteHandler.Logout(writer, method);
-        }
         else if (path == "/addCards" && IsAdmin(authorizationToken))
         {
             RouteHandler.AddCards(writer, method, data.ToString());
@@ -119,13 +117,13 @@ public static class Server
             RouteHandler.BuyPack(writer, method, authorizationToken, data.ToString());
         }
         else if (path == "/cards") {
-            RouteHandler.showCards(writer, method, authorizationToken);
+            RouteHandler.ShowCards(writer, method, authorizationToken);
         }
         else if (path == "/deck") {
-            RouteHandler.deckManagement(writer, method, authorizationToken, data.ToString());
+            RouteHandler.DeckManagement(writer, method, authorizationToken, data.ToString());
         }
         else if (path == "/myProfile") {
-            RouteHandler.userProfile(writer, method, authorizationToken, data.ToString());
+            RouteHandler.UserProfile(writer, method, authorizationToken, data.ToString());
         }
         else if (path == "/scoreboard") {
             RouteHandler.Scoreboard(writer, method);
@@ -133,16 +131,32 @@ public static class Server
         else if (path == "/battle") {
             RouteHandler.Battle(writer, method, authorizationToken);
         }
+        else if (path == "/tradings") {
+            RouteHandler.Tradings(writer, method, authorizationToken, data.ToString());
+        } 
+        else if (IsWildcardMatch(path, "/tradings/*")) {       //* as a wildcard
+            RouteHandler.Trade(writer, method, path, authorizationToken, data.ToString());
+        }
         
         else {
             RouteHandler.NotFound(writer);
         }
     }
     
+    
+    static bool IsWildcardMatch(string input, string pattern) {
+        string regexPattern = Regex.Escape(pattern).Replace("\\*", ".*");
+        return Regex.IsMatch(input, regexPattern);
+    }
+    
     public static bool IsLoggedIn(string authorizationToken) {
-        if (sessionUsers.ContainsKey(authorizationToken)) {
-            if (!sessionUsers[authorizationToken].sessionExpired()) {
+        if (SessionUsers.ContainsKey(authorizationToken)) {
+            if (!SessionUsers[authorizationToken].SessionExpired()) {
                 return true;
+            }
+            else
+            {
+                SessionUsers.Remove(authorizationToken);
             }
         }
         return false;
@@ -150,7 +164,7 @@ public static class Server
     
     private static bool IsAdmin(string authorizationToken) {
         if (IsLoggedIn(authorizationToken)) {
-            if (sessionUsers[authorizationToken].isAdmin) {
+            if (SessionUsers[authorizationToken].IsAdmin) {
                 return true;
             }
         }
@@ -159,7 +173,6 @@ public static class Server
     
     //to do: implement more checks later
     private static bool IsRequestValid(string url) {
-
         // Check for path traversal
         if (url.Contains("..")) {
             return false;

@@ -1,52 +1,73 @@
-﻿using MTCG.Models;
+﻿using System.Collections.Concurrent;
+
+using MTCG.Models;
 namespace MTCG.Logic;
 
 public class BattleManager
 {
-    private List<User> matchmakingList = new List<User>();
-    
-    public string enterMatchmaking(User user) {
-        if (!matchmakingList.Contains(user))
-        {
-            matchmakingList.Add(user);
-            Console.WriteLine($"{user.username} entered matchmaking.");
-            User opponent = searchForMatch(user);
-            Battle battle = new Battle(user, opponent);
-            battle.StartBattle();
-            return battle.getLog();
-        }
+    private BlockingCollection<User> _matchmakingQueue = new BlockingCollection<User>();
+    private BlockingCollection<string> _resultQueue = new BlockingCollection<string>();
+    private static int _requiredStringCount = 2;
+    private static int _suppliedStringCount = 0;
+    private static SemaphoreSlim _semaphore = new SemaphoreSlim(0);
+    private static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
-        return "Already in Matchmaking";
+
+    public void StartMatchmaking() {
+        Task.Run(() => MatchMakingLoop(), _cancellationTokenSource.Token);
     }
 
-    private User searchForMatch(User user)
+    public void MatchMakingLoop()
     {
-        while (true) {
+        while (true)
+        {
+            _semaphore.Wait(_cancellationTokenSource.Token);
+            
+            List<User> users = new List<User>
+            {
+                _matchmakingQueue.Take(),
+                _matchmakingQueue.Take()
+            };
 
-            // Search for a match among other users in the list
-            for (int i = 0; i < matchmakingList.Count; i++) {
-                User potentialMatch = matchmakingList[i];
-                if (IsMatch(user, potentialMatch)) {
-                    Console.WriteLine($"Match found! {user.username} vs {potentialMatch.username}");
+            Battle battle = new Battle(users[0], users[1]);
+            battle.StartBattle();
 
-                    matchmakingList.Remove(user);
-                    matchmakingList.Remove(potentialMatch);
-                    
-                    return potentialMatch;
-                }
-            }
+            string log = battle.GetLog();
 
-            // No match found for the current user, continue searching
-            Console.WriteLine($"{user.username} is still in the queue. Waiting for a match...");
-
-            // Simulate time passing or other actions...
-            Thread.Sleep(3000); 
+            // Add the result to the queue
+            _resultQueue.Add(log);
+            _resultQueue.Add(log);
         }
     }
-    private bool IsMatch(User user, User potentialMatch) {
-        if (user.id == potentialMatch.id) {
-            return false;
+
+
+
+    public void EnterMatchmaking(User user)
+    {
+        // Your logic to supply data to the loop goes here
+        _matchmakingQueue.Add(user);
+        
+        // Increment the supplied string count
+        Interlocked.Increment(ref _suppliedStringCount);
+
+        // Release the semaphore to signal that data is available
+        _semaphore.Release();
+
+        // If supplied enough strings, reset the count and data
+        if (_suppliedStringCount >= _requiredStringCount)
+        {
+            _suppliedStringCount = 0;
+            _matchmakingQueue = new BlockingCollection<User>();  // Reset the data queue
         }
-        return true;
+
+        
+    }
+    
+    
+    
+
+    public string WaitForResult() {
+
+        return _resultQueue.Take();  // Use the variable 'log' instead of calling 'resultQueue.Take()' again
     }
 }

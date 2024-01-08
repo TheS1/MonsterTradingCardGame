@@ -2,19 +2,15 @@ namespace MTCG.Models;
 
 public class Card
 {
+
     public string Id { get; set; }
     public string Name { get; set; }
     public string Type { get; set; }
     public double Damage { get; set; }
     public ElementType Element { get; set; }
     
-    public double CalculateDamage(Card opponent)
-    {
-        if (opponent.Type == "Monster")
-        {
-            return Damage; // Monster cards' damage is not affected by element type
-        }
-        if (opponent.Type == "Spell")
+    public double CalculateDamage(Card opponent) {
+        if (opponent.Type == "Spell" || Type == "Spell")
         {
             // Spell cards' damage is affected by element type
             if (Element == opponent.Element)
@@ -32,7 +28,7 @@ public class Card
             
         }
 
-        return 0; // Default to 0 damage if unknown card type
+        return Damage;
     }
 
 }
